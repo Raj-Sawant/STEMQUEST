@@ -2,13 +2,12 @@ services:
   - type: web
     name: stem-quest-backend
     env: node
-    rootDir: "STEM QUEST/server"
-    buildCommand: npm install
-    startCommand: node index.js
+    buildCommand: 'cd "STEM QUEST/server" && npm install'
+    startCommand: 'cd "STEM QUEST/server" && node index.js'
     envVars:
       - key: NODE_VERSION
         value: 18.17.0
       - key: MONGODB_URI
-        sync: false # You will need to paste your MongoDB Atlas URL in Render dashboard
+        sync: false # Paste your MongoDB Atlas string here
       - key: JWT_SECRET
         generateValue: true
