@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dragon Math Quest</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        #game-container {
+            border: 3px solid #gold;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            color: white;
+            text-align: center;
+        }
+        
+        .flashcard {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #gold;
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            min-width: 300px;
+        }
+        
+        .flashcard input {
+            font-size: 20px;
+            padding: 10px;
+            border: 2px solid #gold;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            text-align: center;
+            margin: 10px;
+        }
+        
+        .flashcard button {
+            font-size: 18px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #ff6b35;
+            color: white;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .flashcard button:hover {
+            background: #ff8c42;
+        }
+        
+        .countdown {
+            font-size: 72px;
+            font-weight: bold;
+            color: #ff6b35;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .health-bar {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #gold;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 10px;
+        }
+        
+        .health-fill {
+            height: 20px;
+            background: linear-gradient(90deg, #ff0000, #ff6b35);
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-overlay">
+            <div id="countdown" class="countdown hidden"></div>
+            <div id="flashcard" class="flashcard hidden">
+                <div id="question"></div>
+                <input type="number" id="answer-input" placeholder="Enter your answer">
+                <br>
+                <button onclick="checkAnswer()">Submit Answer</button>
+                <div id="feedback" style="margin-top: 10px;"></div>
+            </div>
+            <div id="health-display" class="health-bar hidden">
+                <div>Skeleton Health</div>
+                <div class="health-fill" id="skeleton-health" style="width: 100%;"></div>
+            </div>
+            <div id="score-display" style="color: white; font-size: 24px; margin: 10px;">Score: <span id="score">0</span></div>
+        </div>
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <script>
+        // Game variables
+        let game;
+        let dragon, skeleton;
+        let fireballs;
+        let skeletonHealth = 2;
+        let maxSkeletonHealth = 2;
+        let currentQuestion = null;
+        let score = 0;
+        let gameStarted = false;
+        let mathQuestions = [];
+
+        // Generate math questions
+        function generateMathQuestion() {
+            const operations = ['+', '-', '*'];
+            const operation = operations[Math.floor(Math.random() * operations.length)];
+            let num1, num2, answer;
+            
+            switch(operation) {
+                case '+':
+                    num1 = Math.floor(Math.random() * 50) + 1;
+                    num2 = Math.floor(Math.random() * 50) + 1;
+                    answer = num1 + num2;
+                    break;
+                case '-':
+                    num1 = Math.floor(Math.random() * 50) + 10;
+                    num2 = Math.floor(Math.random() * num1) + 1;
+                    answer = num1 - num2;
+                    break;
+                case '*':
+                    num1 = Math.floor(Math.random() * 12) + 1;
+                    num2 = Math.floor(Math.random() * 12) + 1;
+                    answer = num1 * num2;
+                    break;
+            }
+            
+            return {
+                question: `${num1} ${operation} ${num2} = ?`,
+                answer: answer
+            };
+        }
+
+        // Start countdown
+        function startCountdown() {
+            const countdownElement = document.getElementById('countdown');
+            countdownElement.classList.remove('hidden');
+            let count = 3;
+            
+            const countdownInterval = setInterval(() => {
+                countdownElement.textContent = count;
+                if (count === 0) {
+                    countdownElement.textContent = 'GO!';
+                    setTimeout(() => {
+                        countdownElement.classList.add('hidden');
+                        startGame();
+                    }, 1000);
+                    clearInterval(countdownInterval);
+                }
+                count--;
+            }, 1000);
+        }
+
+        function startGame() {
+            gameStarted = true;
+            document.getElementById('health-display').classList.remove('hidden');
+            showNextQuestion();
+        }
+
+        function showNextQuestion() {
+            currentQuestion = generateMathQuestion();
+            document.getElementById('question').textContent = currentQuestion.question;
+            document.getElementById('answer-input').value = '';
+            document.getElementById('answer-input').focus();
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('flashcard').classList.remove('hidden');
+        }
+
+        function checkAnswer() {
+            const userAnswer = parseInt(document.getElementById('answer-input').value);
+            const feedback = document.getElementById('feedback');
+            
+            if (userAnswer === currentQuestion.answer) {
+                feedback.textContent = 'Correct! Dragon attacks!';
+                feedback.style.color = '#00ff00';
+                
+                // Trigger dragon attack
+                setTimeout(() => {
+                    dragonAttack();
+                    document.getElementById('flashcard').classList.add('hidden');
+                }, 1000);
+                
+                score += 10;
+                document.getElementById('score').textContent = score;
+            } else {
+                feedback.textContent = `Wrong! The answer was ${currentQuestion.answer}`;
+                feedback.style.color = '#ff0000';
+                
+                setTimeout(() => {
+                    showNextQuestion();
+                }, 2000);
+            }
+        }
+
+        function dragonAttack() {
+            // Create enhanced fireball animation
+            if (dragon && skeleton) {
+                // Dragon breathing animation
+                game.scene.scenes[0].tweens.add({
+                    targets: dragon,
+                    scaleX: 1.2,
+                    duration: 200,
+                    yoyo: true,
+                    ease: 'Power2'
+                });
+                
+                // Create fireball with glowing effect
+                const fireball = game.scene.scenes[0].add.circle(dragon.x + 50, dragon.y, 12, 0xff6b35);
+                const fireballGlow = game.scene.scenes[0].add.circle(dragon.x + 50, dragon.y, 20, 0xff9900, 0.3);
+                const fireballCore = game.scene.scenes[0].add.circle(dragon.x + 50, dragon.y, 8, 0xffff00, 0.8);
+                
+                // Fireball spinning animation
+                game.scene.scenes[0].tweens.add({
+                    targets: [fireball, fireballGlow, fireballCore],
+                    angle: 360,
+                    duration: 800,
+                    repeat: -1
+                });
+                
+                // Fireball travel animation
+                const fireballTween = game.scene.scenes[0].tweens.add({
+                    targets: [fireball, fireballGlow, fireballCore],
+                    x: skeleton.x - 30,
+                    y: skeleton.y,
+                    duration: 800,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        // Multiple explosion effects
+                        const explosion1 = game.scene.scenes[0].add.circle(skeleton.x, skeleton.y, 25, 0xff0000, 0.8);
+                        const explosion2 = game.scene.scenes[0].add.circle(skeleton.x, skeleton.y, 35, 0xff6600, 0.6);
+                        const explosion3 = game.scene.scenes[0].add.circle(skeleton.x, skeleton.y, 45, 0xff9900, 0.4);
+                        
+                        // Screen shake effect
+                        game.scene.scenes[0].cameras.main.shake(200, 0.01);
+                        
+                        // Explosion animation
+                        game.scene.scenes[0].tweens.add({
+                            targets: [explosion1, explosion2, explosion3],
+                            scaleX: 2.5,
+                            scaleY: 2.5,
+                            alpha: 0,
+                            duration: 400,
+                            ease: 'Power2',
+                            onComplete: () => {
+                                explosion1.destroy();
+                                explosion2.destroy();
+                                explosion3.destroy();
+                            }
+                        });
+                        
+                        // Add impact particles
+                        const particles = game.scene.scenes[0].add.particles(skeleton.x, skeleton.y, 'skeleton', {
+                            scale: { start: 0.3, end: 0 },
+                            speed: { min: 50, max: 100 },
+                            lifespan: 500,
+                            tint: [0xff0000, 0xff6600, 0xffaa00],
+                            quantity: 10
+                        });
+                        
+                        setTimeout(() => particles.destroy(), 600);
+                        
+                        fireball.destroy();
+                        fireballGlow.destroy();
+                        fireballCore.destroy();
+                        damageskeleton();
+                    }
+                });
+            }
+        }
+
+        function damageskeleton() {
+            skeletonHealth--;
+            const healthPercent = (skeletonHealth / maxSkeletonHealth) * 100;
+            document.getElementById('skeleton-health').style.width = healthPercent + '%';
+            
+            // Skeleton damage animation
+            if (skeleton) {
+                game.scene.scenes[0].tweens.add({
+                    targets: skeleton,
+                    x: skeleton.x + 20,
+                    duration: 100,
+                    yoyo: true,
+                    repeat: 2
+                });
+            }
+            
+            if (skeletonHealth <= 0) {
+                // Skeleton defeated
+                setTimeout(() => {
+                    alert(`Victory! You defeated the skeleton! Final Score: ${score}`);
+                    resetGame();
+                }, 1000);
+            } else {
+                // Continue with next question
+                setTimeout(() => {
+                    showNextQuestion();
+                }, 1500);
+            }
+        }
+
+        function resetGame() {
+            skeletonHealth = maxSkeletonHealth;
+            score = 0;
+            document.getElementById('score').textContent = score;
+            document.getElementById('skeleton-health').style.width = '100%';
+            document.getElementById('flashcard').classList.add('hidden');
+            document.getElementById('health-display').classList.add('hidden');
+            gameStarted = false;
+            startCountdown();
+        }
+
+        // Handle Enter key press
+        document.getElementById('answer-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        // Phaser game configuration
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            parent: 'game-container',
+            canvas: document.getElementById('game-canvas'),
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 }
+                }
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        function preload() {
+            // Create detailed dragon sprite
+            const dragonGraphics = this.add.graphics();
+            // Dragon body
+            dragonGraphics.fillStyle(0xff4500);
+            dragonGraphics.fillEllipse(50, 40, 80, 50);
+            // Dragon head
+            dragonGraphics.fillStyle(0xff6b35);
+            dragonGraphics.fillEllipse(80, 25, 40, 35);
+            // Dragon wings
+            dragonGraphics.fillStyle(0x8b4513);
+            dragonGraphics.fillEllipse(20, 30, 50, 70);
+            dragonGraphics.fillEllipse(15, 35, 40, 60);
+            // Dragon tail
+            dragonGraphics.fillStyle(0xff4500);
+            dragonGraphics.fillEllipse(10, 50, 30, 20);
+            // Dragon spikes
+            dragonGraphics.fillStyle(0xff0000);
+            dragonGraphics.fillTriangle(40, 15, 45, 5, 50, 15);
+            dragonGraphics.fillTriangle(50, 15, 55, 5, 60, 15);
+            dragonGraphics.fillTriangle(60, 15, 65, 5, 70, 15);
+            dragonGraphics.generateTexture('dragon', 100, 80);
+            dragonGraphics.destroy();
+                
+            // Create detailed skeleton sprite
+            const skeletonGraphics = this.add.graphics();
+            // Skeleton head (skull)
+            skeletonGraphics.fillStyle(0xf0f0f0);
+            skeletonGraphics.fillCircle(30, 20, 15);
+            // Skeleton body (ribcage)
+            skeletonGraphics.fillRect(25, 30, 10, 30);
+            // Skeleton arms
+            skeletonGraphics.fillRect(15, 35, 15, 4);
+            skeletonGraphics.fillRect(40, 35, 15, 4);
+            // Skeleton legs
+            skeletonGraphics.fillRect(27, 60, 3, 25);
+            skeletonGraphics.fillRect(33, 60, 3, 25);
+            // Skeleton ribs
+            skeletonGraphics.lineStyle(2, 0xf0f0f0);
+            skeletonGraphics.beginPath();
+            skeletonGraphics.moveTo(25, 35);
+            skeletonGraphics.lineTo(35, 35);
+            skeletonGraphics.moveTo(25, 40);
+            skeletonGraphics.lineTo(35, 40);
+            skeletonGraphics.moveTo(25, 45);
+            skeletonGraphics.lineTo(35, 45);
+            skeletonGraphics.strokePath();
+            skeletonGraphics.generateTexture('skeleton', 60, 100);
+            skeletonGraphics.destroy();
+        }
+
+        function create() {
+            // Create background with gradient effect
+            const bg = this.add.graphics();
+            bg.fillGradientStyle(0x1e3c72, 0x1e3c72, 0x2a5298, 0x2a5298, 1);
+            bg.fillRect(0, 0, 800, 600);
+            
+            // Add clouds for atmosphere
+            this.add.ellipse(150, 100, 80, 40, 0xffffff, 0.3);
+            this.add.ellipse(350, 80, 100, 50, 0xffffff, 0.2);
+            this.add.ellipse(600, 120, 90, 45, 0xffffff, 0.25);
+            
+            // Add ground with texture
+            this.add.rectangle(400, 550, 800, 100, 0x4a4a4a);
+            this.add.rectangle(400, 540, 800, 20, 0x5a5a5a);
+            
+            // Create dragon
+            dragon = this.add.image(150, 450, 'dragon');
+            
+            // Create skeleton
+            skeleton = this.add.image(650, 450, 'skeleton');
+            
+            // Add dragon glowing eyes
+            const dragonEye1 = this.add.circle(dragon.x + 15, dragon.y - 15, 4, 0xff0000);
+            const dragonEye2 = this.add.circle(dragon.x + 25, dragon.y - 15, 4, 0xff0000);
+            dragonEye1.setAlpha(0.8);
+            dragonEye2.setAlpha(0.8);
+            
+            // Add dragon flame breath effect (idle)
+            const flameParticles = this.add.particles(dragon.x + 40, dragon.y - 5, 'skeleton', {
+                scale: { start: 0.1, end: 0 },
+                speed: { min: 20, max: 40 },
+                lifespan: 300,
+                tint: [0xff6600, 0xff9900, 0xffcc00],
+                frequency: 200,
+                quantity: 2
+            });
+            
+            // Add skeleton glowing red eyes
+            const skeletonEye1 = this.add.circle(skeleton.x - 8, skeleton.y - 30, 3, 0xff0000);
+            const skeletonEye2 = this.add.circle(skeleton.x + 8, skeleton.y - 30, 3, 0xff0000);
+            
+            // Eye glow animation
+            this.tweens.add({
+                targets: [dragonEye1, dragonEye2, skeletonEye1, skeletonEye2],
+                alpha: 0.3,
+                duration: 1000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Dragon hovering animation
+            this.tweens.add({
+                targets: [dragon, dragonEye1, dragonEye2],
+                y: '+=15',
+                duration: 2000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Dragon wing flapping effect
+            this.tweens.add({
+                targets: dragon,
+                scaleY: 1.1,
+                duration: 300,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Power1'
+            });
+            
+            // Skeleton idle sway animation
+            this.tweens.add({
+                targets: [skeleton, skeletonEye1, skeletonEye2],
+                x: '+=10',
+                duration: 3000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Skeleton menacing animation
+            this.tweens.add({
+                targets: skeleton,
+                angle: 2,
+                duration: 4000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
+
+        function update() {
+            // Game loop updates
+        }
+
+        // Initialize the game
+        game = new Phaser.Game(config);
+        
+        // Start the game after a short delay
+        setTimeout(() => {
+            startCountdown();
+        }, 1000);
+    </script>
+</body>
+</html>
