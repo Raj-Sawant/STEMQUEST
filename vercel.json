@@ -1,5 +1,6 @@
 {
-  "buildCommand": "cd \"STEM QUEST\" && npm run build",
-  "outputDirectory": "STEM QUEST/build",
-  "installCommand": "cd \"STEM QUEST\" && npm install"
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "installCommand": "npm install",
+  "framework": "vite"
 }

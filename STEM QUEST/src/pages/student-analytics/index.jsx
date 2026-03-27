@@ -44,7 +44,7 @@ const StudentAnalytics = () => {
         return;
       }
       try {
-        const res = await axios.get('http://127.0.0.1:5000/api/teacher/students', {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'}/api/teacher/students`, {
           headers: { 'x-auth-token': token }
         });
         setStudents(res.data);

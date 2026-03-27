@@ -183,7 +183,7 @@ const GamePlayer = () => {
       if (userStr && token) {
         try {
           // Check daily limit
-          const res = await axios.get('http://127.0.0.1:5000/api/auth/me', {
+          const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'}/api/auth/me`, {
             headers: { 'x-auth-token': token }
           });
           if (res.data.dailyPlayTime >= PLAY_LIMIT) {
@@ -214,7 +214,7 @@ const GamePlayer = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await axios.post('http://127.0.0.1:5000/api/progress', {
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'}/api/progress`, {
         gameId,
         score: levelProgress * 10, // Example score
         progress: overallProgress,

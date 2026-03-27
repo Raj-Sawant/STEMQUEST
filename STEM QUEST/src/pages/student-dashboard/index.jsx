@@ -27,7 +27,7 @@ const StudentDashboard = () => {
       const token = localStorage.getItem('stemquest_token');
       if (token) {
         try {
-          const response = await axios.get('http://127.0.0.1:5000/api/auth/me', {
+          const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'}/api/auth/me`, {
             headers: { 'x-auth-token': token }
           });
           const user = response.data;

@@ -17,7 +17,7 @@ const LoginForm = ({ language = 'en', isOffline = false }) => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const API_URL = 'http://127.0.0.1:5000/api/auth';
+  const API_URL = `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'}/api/auth`;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
