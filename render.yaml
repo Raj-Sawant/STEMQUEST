@@ -2,8 +2,9 @@ services:
   - type: web
     name: stem-quest-backend
     env: node
-    buildCommand: 'cd "STEM QUEST/server" && npm install'
-    startCommand: 'cd "STEM QUEST/server" && node index.js'
+    rootDir: "STEM QUEST/server"
+    buildCommand: "npm install"
+    startCommand: "node index.js"
     envVars:
       - key: NODE_VERSION
         value: 18.17.0
